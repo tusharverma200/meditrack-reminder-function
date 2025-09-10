@@ -1,61 +1,41 @@
-import { Client, Databases, Users, Messaging, Query } from "node-appwrite";
+import { Client, Databases, Query, Messaging } from "node-appwrite";
 
-export default async ({ req, res, log, error }) => {
+export default async function main(req, res) {
   const client = new Client()
-    .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT || "https://cloud.appwrite.io/v1")
+    .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
     .setProject(process.env.APPWRITE_PROJECT_ID)
     .setKey(process.env.APPWRITE_API_KEY);
 
   const databases = new Databases(client);
-  const users = new Users(client);
   const messaging = new Messaging(client);
 
-  const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
-  const COLLECTION_ID = process.env.APPWRITE_COLLECTION_ID;
-
   try {
-    // ✅ Step 1: Find medicines scheduled for the next 10 minutes
-    const now = new Date();
-    const in10 = new Date(now.getTime() + 10 * 60 * 1000);
+    // 1️⃣ Fetch today’s medicines from DB
+    const today = new Date();
+    const todayDate = today.toISOString().split("T")[0]; // yyyy-mm-dd
 
-    const medicines = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
-      Query.greaterEqual("time", now.toISOString()),
-      Query.lessEqual("time", in10.toISOString()),
-    ]);
+    const medicines = await databases.listDocuments(
+      process.env.DATABASE_ID,
+      process.env.COLLECTION_ID,
+      [Query.equal("date", todayDate)]
+    );
 
-    if (medicines.total === 0) {
-      log("No reminders found in this interval.");
-      return res.json({ message: "No reminders to send." });
-    }
-
-    log(`Found ${medicines.total} medicines needing reminders.`);
-
-    // ✅ Step 2: For each medicine, get the user & send email
+    // 2️⃣ Loop through medicines and send reminders
     for (const med of medicines.documents) {
-      try {
-        const user = await users.get(med.$permissions[0].split(":")[1]); 
-        // assumes Role.user($id) is set in permissions
+      const userEmail = med.userEmail; // assuming you store email with medicine
+      const medName = med.medicine;
+      const medTime = med.time;
 
-        if (!user.email) continue;
-
-        await messaging.createEmail(
-          ID.unique(),
-          {
-            to: [user.email],
-            subject: `💊 Reminder: ${med.name}`,
-            text: `Hello, this is your reminder to take ${med.name} (${med.dose}) at ${new Date(med.time).toLocaleString()}.`,
-          }
-        );
-
-        log(`Reminder sent to ${user.email} for ${med.name}`);
-      } catch (err) {
-        error(`Failed to send reminder for medicine ${med.name}: ${err.message}`);
-      }
+      await messaging.createEmail({
+        subject: "💊 Medicine Reminder",
+        content: `Hello! This is a reminder to take your medicine: ${medName} at ${medTime}.`,
+        recipients: [userEmail],
+      });
     }
 
-    return res.json({ message: "Reminders processed." });
+    res.json({ success: true, sent: medicines.documents.length });
   } catch (err) {
-    error("Error running reminder function: " + err.message);
-    return res.json({ error: err.message }, 500);
+    console.error("Reminder error:", err);
+    res.json({ success: false, error: err.message });
   }
-};
+}
