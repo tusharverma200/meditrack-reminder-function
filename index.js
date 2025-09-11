@@ -25,6 +25,8 @@ export default async function main(req, res) {
       const userEmail = med.userEmail; // assuming you store email with medicine
       const medName = med.medicine;
       const medTime = med.time;
+      console.log("Checking medicine:", med.medicine, med.time, med.userEmail);
+
 
       await messaging.createEmail({
         subject: "💊 Medicine Reminder",
