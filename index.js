@@ -4,7 +4,7 @@ export default async function main(context) {
   const { req, res, log, error } = context;
 
   const client = new Client()
-    .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
+    .setEndpoint(process.env.APPWRITE_API_ENDPOINT)
     .setProject(process.env.APPWRITE_PROJECT_ID)
     .setKey(process.env.APPWRITE_API_KEY);
 
