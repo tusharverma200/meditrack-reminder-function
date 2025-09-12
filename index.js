@@ -31,11 +31,17 @@ export default async function main(context) {
 
       if (!userEmail) continue;
 
-      await messaging.createEmail({
-        subject: "💊 Medicine Reminder",
-        content: `Hello! This is a reminder to take your medicine: ${medName} at ${medTime}.`,
-        recipients: [userEmail],
-      });
+      await messaging.createEmail(
+      `med-reminder-${Date.now()}`,            // messageId (unique)
+      "💊 Medicine Reminder",                  // subject
+      `Hello! This is a reminder to take your medicine: ${medName} at ${medTime}.`, // content
+      [],                                     // topics
+      [med.userId],                           // users (send to this user)
+      [], [], [], [],                         // targets, cc, bcc, attachments
+      false,                                  // draft
+      false                                   // html (set to true if content is HTML)
+    );
+
     }
 
     return res.json({ success: true, sent: medicines.documents.length });
