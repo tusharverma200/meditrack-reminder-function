@@ -14,14 +14,6 @@ export default async function main(context) {
   const databaseId = process.env.APPWRITE_DATABASE_ID;
   const collectionId = process.env.APPWRITE_COLLECTION_ID;
 
-  console.log("Environment Variables:", {
-    "APPWRITE_FUNCTION_API_ENDPOINT": process.env.APPWRITE_FUNCTION_API_ENDPOINT,
-    "APPWRITE_PROJECT_ID": process.env.APPWRITE_PROJECT_ID,
-    "APPWRITE_API_KEY": process.env.APPWRITE_FUNCTION_API_KEY,
-    "APPWRITE_DATABASE_ID": process.env.APPWRITE_DATABASE_ID,
-    "APPWRITE_COLLECTION_ID": process.env.APPWRITE_COLLECTION_ID,
-  });
-
   try {
     // 1️⃣ Fetch all medicines from DB
     const medicines = await databases.listDocuments(
