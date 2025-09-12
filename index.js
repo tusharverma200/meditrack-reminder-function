@@ -1,58 +1,56 @@
-import { Client, Databases, Query, Messaging } from "node-appwrite";
+import { Client, Databases, Query } from "node-appwrite";
+import nodemailer from "nodemailer";
 
-export default async function main(context) {
-  const { req, res, log, error } = context;
-
-  const client = new Client()
-    .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
-    .setProject(process.env.APPWRITE_PROJECT_ID)
-    .setKey(process.env.APPWRITE_API_KEY);
-
-  const databases = new Databases(client);
-  const messaging = new Messaging(client);
-
-  const databaseId = process.env.APPWRITE_DATABASE_ID;
-  const collectionId = process.env.APPWRITE_COLLECTION_ID;
-
-  console.log("Environment Variables:", {
-    "APPWRITE_FUNCTION_API_ENDPOINT": process.env.APPWRITE_FUNCTION_API_ENDPOINT,
-    "APPWRITE_PROJECT_ID": process.env.APPWRITE_PROJECT_ID,
-    "APPWRITE_API_KEY": process.env.APPWRITE_FUNCTION_API_KEY,
-    "APPWRITE_DATABASE_ID": process.env.APPWRITE_DATABASE_ID,
-    "APPWRITE_COLLECTION_ID": process.env.APPWRITE_COLLECTION_ID,
-  });
-
+export default async function main(req, res) {
   try {
+    // Initialize Appwrite client
+    const client = new Client()
+      .setProject(process.env.APPWRITE_PROJECT_ID)
+      .setKey(process.env.APPWRITE_API_KEY);
+
+    const databases = new Databases(client);
+
+    // Get today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split("T")[0];
 
-    const medicines = await databases.listDocuments({
-      databaseId,
-      collectionId,
-      queries: [
-        Query.equal("date", today)
-      ]
+    // Fetch documents with today's date
+    const result = await databases.listDocuments({
+      databaseId: process.env.APPWRITE_DATABASE_ID,
+      collectionId: process.env.APPWRITE_COLLECTION_ID,
+      queries: [Query.equal("date", today)],
     });
 
-    // 2️⃣ Loop through medicines and send reminders
-    for (const med of medicines.documents) {
-      const userEmail = med.userEmail;
-      const medName = med.name;
-      const medTime = med.time;
+    const docs = result.documents;
 
-      log(`Checking medicine: ${medName}, ${medTime}, ${userEmail}`);
+    if (!docs || docs.length === 0) {
+      console.log("No reminders for today");
+      return res.json({ success: true, message: "No reminders today" });
+    }
 
-      if (!userEmail) continue;
+    // Configure SMTP transporter
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: false, // true if using port 465
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
 
-      await messaging.createEmail({
-        subject: "💊 Medicine Reminder",
-        content: `Hello! This is a reminder to take your medicine: ${medName} at ${medTime}.`,
-        recipients: [userEmail],
+    // Send email to each user
+    for (const doc of docs) {
+      await transporter.sendMail({
+        from: `"Medicine Reminder" <${process.env.SMTP_USER}>`,
+        to: doc.email, // ensure your collection has `email` field
+        subject: "Your Medicine Reminder",
+        text: `Hello ${doc.name},\n\nThis is your reminder to take your medicine: ${doc.medicine}.`,
       });
     }
 
-    return res.json({ success: true, sent: medicines.documents.length });
+    return res.json({ success: true, sent: docs.length });
   } catch (err) {
-    error("Reminder error:", err);
-    return res.json({ success: false, error: err.message });
+    console.error(err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 }
