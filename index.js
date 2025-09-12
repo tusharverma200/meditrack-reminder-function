@@ -23,11 +23,15 @@ export default async function main(context) {
   });
 
   try {
-    // 1️⃣ Fetch all medicines from DB
-    const medicines = await databases.listDocuments(
+    const today = new Date().toISOString().split("T")[0];
+
+    const medicines = await databases.listDocuments({
       databaseId,
-      collectionId
-    );
+      collectionId,
+      queries: [
+        Query.equal("date", today)
+      ]
+    });
 
     // 2️⃣ Loop through medicines and send reminders
     for (const med of medicines.documents) {
