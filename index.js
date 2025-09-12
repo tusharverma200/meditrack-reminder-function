@@ -1,6 +1,8 @@
-import { Client, Databases, Messaging } from "node-appwrite";
+import { Client, Databases, Query, Messaging } from "node-appwrite";
 
-export default async function main(req, res) {
+export default async function main(context) {
+  const { req, res, log, error } = context;
+
   const client = new Client()
     .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
     .setProject(process.env.APPWRITE_PROJECT_ID)
@@ -13,34 +15,32 @@ export default async function main(req, res) {
   const collectionId = process.env.APPWRITE_COLLECTION_ID;
 
   try {
-    // 1️⃣ Get all medicines
-    const { documents } = await databases.listDocuments(databaseId, collectionId);
+    // 1️⃣ Fetch all medicines from DB
+    const medicines = await databases.listDocuments(
+      databaseId,
+      collectionId
+    );
 
-    const today = new Date();
-    const todayDate = today.toDateString(); // e.g. "Fri Sep 12 2025"
+    // 2️⃣ Loop through medicines and send reminders
+    for (const med of medicines.documents) {
+      const userEmail = med.userEmail;
+      const medName = med.name;
+      const medTime = med.time;
 
-    let sentCount = 0;
+      log(`Checking medicine: ${medName}, ${medTime}, ${userEmail}`);
 
-    for (const med of documents) {
-      if (!med.userEmail) continue; // skip if email missing
+      if (!userEmail) continue;
 
-      const medTime = new Date(med.time); // convert from string
-      if (medTime.toDateString() === todayDate) {
-        console.log("📨 Sending reminder to:", med.userEmail, med.name, med.time);
-
-        await messaging.createEmail({
-          subject: "💊 Medicine Reminder",
-          content: `Hello! This is a reminder to take your medicine: ${med.name} at ${med.time}.`,
-          recipients: [med.userEmail],
-        });
-
-        sentCount++;
-      }
+      await messaging.createEmail({
+        subject: "💊 Medicine Reminder",
+        content: `Hello! This is a reminder to take your medicine: ${medName} at ${medTime}.`,
+        recipients: [userEmail],
+      });
     }
 
-    return res.json({ success: true, sent: sentCount });
+    return res.json({ success: true, sent: medicines.documents.length });
   } catch (err) {
-    console.error("Reminder error:", err);
+    error("Reminder error:", err);
     return res.json({ success: false, error: err.message });
   }
 }
