@@ -31,7 +31,7 @@ export default async function main(context) {
 
       if (!userEmail) continue;
 
-      await messaging.createEmail(
+     const message = await messaging.createEmail(
       `med-reminder-${Date.now()}`,            // messageId (unique)
       "💊 Medicine Reminder",                  // subject
       `Hello! This is a reminder to take your medicine: ${medName} at ${medTime}.`, // content
@@ -42,7 +42,11 @@ export default async function main(context) {
       false                                   // html (set to true if content is HTML)
     );
 
+    log('message', message);
+
     }
+
+    
 
     return res.json({ success: true, sent: medicines.documents.length });
   } catch (err) {
