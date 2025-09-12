@@ -1,7 +1,7 @@
-import { Client, Databases, Query, Messaging } from "node-appwrite";
+import { Client, Databases, Messaging } from "node-appwrite";
 
 export default async function main(context) {
-  const { req, res, log, error } = context;
+  const { res, log, error } = context;
 
   const client = new Client()
     .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
@@ -15,40 +15,70 @@ export default async function main(context) {
   const collectionId = process.env.APPWRITE_COLLECTION_ID;
 
   try {
-    // 1️⃣ Fetch all medicines from DB
-    const medicines = await databases.listDocuments(
-      databaseId,
-      collectionId
-    );
+    const medicines = await databases.listDocuments(databaseId, collectionId);
 
-    // 2️⃣ Loop through medicines and send reminders
+    const now = new Date();
+    const FIVE_MIN = 5 * 60 * 1000;
+
+    let sentCount = 0;
+
     for (const med of medicines.documents) {
-      const userEmail = med.userEmail;
-      const medName = med.name;
-      const medTime = med.time;
+      const { name, dose, time, userEmail, user_id } = med;
 
-      log(`Checking medicine: ${medName}, ${medTime}, ${userEmail}`);
+      if (!userEmail || !user_id || !time) continue;
 
-      if (!userEmail) continue;
+      const medDate = new Date(time);
+      if (isNaN(medDate)) continue;
 
-     const message = await messaging.createEmail(
-      `med-reminder-${Date.now()}`,            // messageId (unique)
-      "💊 Medicine Reminder",                  // subject
-      `Hello! This is a reminder to take your medicine: ${medName} at ${medTime}.`, // content
-      [],                                     // topics
-      [med.user_id],                           // users (send to this user)
-      [], [], [], [],                         // targets, cc, bcc, attachments
-      false,                                  // draft
-      false                                   // html (set to true if content is HTML)
-    );
+      const diff = medDate - now;
 
-    log('message', message);
+      // only if within next 5 min
+      if (diff >= 0 && diff <= FIVE_MIN) {
+        const formattedDate = medDate.toLocaleString("en-IN", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
 
+        const emailContent = `
+Hello 👋,
+
+This is your scheduled medicine reminder. Please take your medicine on time.
+
+💊 Medicine: ${name}
+💉 Dose: ${dose || "Not specified"}
+🕒 Scheduled Time: ${formattedDate}
+
+Please make sure to take it on time and stay healthy.
+
+Regards,  
+💚 Your Medicine Reminder Service
+        `.trim();
+
+        const message = await messaging.createEmail(
+          `med-reminder-${Date.now()}`,
+          "💊 Medicine Reminder",
+          emailContent,
+          [],
+          [user_id], // Appwrite user ID
+          [],
+          [],
+          [],
+          [],
+          false,
+          false
+        );
+
+        log(`Sent reminder to ${userEmail}:`, message.$id);
+        sentCount++;
+      }
     }
 
-    
-
-    return res.json({ success: true, sent: medicines.documents.length });
+    return res.json({ success: true, sent: sentCount });
   } catch (err) {
     error("Reminder error:", err);
     return res.json({ success: false, error: err.message });
