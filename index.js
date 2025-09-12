@@ -36,7 +36,7 @@ export default async function main(context) {
       "💊 Medicine Reminder",                  // subject
       `Hello! This is a reminder to take your medicine: ${medName} at ${medTime}.`, // content
       [],                                     // topics
-      [med.userId],                           // users (send to this user)
+      [med.user_id],                           // users (send to this user)
       [], [], [], [],                         // targets, cc, bcc, attachments
       false,                                  // draft
       false                                   // html (set to true if content is HTML)
